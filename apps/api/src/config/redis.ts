@@ -1,12 +1,10 @@
 import Redis from 'ioredis';
-import { validateEnv } from '@mailflow/shared';
+import { getRedisConnectionOptions, validateEnv } from '@mailflow/shared';
 
 const env = validateEnv();
 
 export const redisClient = new Redis({
-  host: env.REDIS_HOST,
-  port: env.REDIS_PORT,
-  password: env.REDIS_PASSWORD || undefined,
+  ...getRedisConnectionOptions(env),
   lazyConnect: true,
   maxRetriesPerRequest: null,
 });

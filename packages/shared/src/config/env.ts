@@ -10,6 +10,7 @@ export const envSchema = z.object({
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.string().default('6379').transform(Number),
   REDIS_PASSWORD: z.string().optional().default(''),
+  REDIS_URL: z.string().url().optional(),
 
   ELASTICSEARCH_NODE: z.string().default('http://localhost:9200'),
 
@@ -30,6 +31,33 @@ export const envSchema = z.object({
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+export interface RedisConnectionOptions {
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  tls?: Record<string, never>;
+}
+
+export function getRedisConnectionOptions(env: Env): RedisConnectionOptions {
+  if (env.REDIS_URL) {
+    const redisUrl = new URL(env.REDIS_URL);
+    return {
+      host: redisUrl.hostname,
+      port: Number(redisUrl.port) || 6379,
+      username: redisUrl.username ? decodeURIComponent(redisUrl.username) : undefined,
+      password: redisUrl.password ? decodeURIComponent(redisUrl.password) : undefined,
+      ...(redisUrl.protocol === 'rediss:' ? { tls: {} } : {}),
+    };
+  }
+
+  return {
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD || undefined,
+  };
+}
 
 export function validateEnv(env: Record<string, string | undefined> = process.env): Env {
   const result = envSchema.safeParse(env);

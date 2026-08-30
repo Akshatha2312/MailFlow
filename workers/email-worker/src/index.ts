@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { Worker } from 'bullmq';
-import { validateEnv, Logger } from '@mailflow/shared';
+import { getRedisConnectionOptions, validateEnv, Logger } from '@mailflow/shared';
 import { processEmailDeliveryJob, EmailDeliveryJobData } from './processor';
 
 // Load environment variables from root
@@ -21,9 +21,7 @@ const worker = new Worker<EmailDeliveryJobData>(
   },
   {
     connection: {
-      host: env.REDIS_HOST,
-      port: env.REDIS_PORT,
-      password: env.REDIS_PASSWORD || undefined,
+      ...getRedisConnectionOptions(env),
     },
     concurrency,
   }

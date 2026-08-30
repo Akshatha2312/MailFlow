@@ -1,16 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import Redis from 'ioredis';
+import { getRedisConnectionOptions, validateEnv } from '@mailflow/shared';
 
 const prisma = new PrismaClient();
 
-const redisHost = process.env.REDIS_HOST || 'localhost';
-const redisPort = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379;
-const redisPassword = process.env.REDIS_PASSWORD || undefined;
+const env = validateEnv();
 
 const redis = new Redis({
-  host: redisHost,
-  port: redisPort,
-  password: redisPassword,
+  ...getRedisConnectionOptions(env),
   lazyConnect: true,
   maxRetriesPerRequest: null,
 });
