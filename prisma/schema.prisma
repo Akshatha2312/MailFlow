@@ -1,0 +1,245 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum AttemptStatus {
+  SUCCESS
+  FAILED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  QUEUED
+  SENDING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  name          String?
+  picture       String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  accounts        OAuthAccount[]
+  sessions        Session[]
+  senders         Sender[]
+  emailJobs       EmailJob[]
+  campaigns       Campaign[]
+  slackConnection SlackConnection?
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id                String    @id @default(uuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?   @db.Text
+  refreshToken      String?   @db.Text
+  expiresAt         Int?
+  tokenType         String?
+  scope             String?   @db.Text
+  idToken           String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Sender {
+  id                 String             @id @default(uuid())
+  userId             String
+  email              String
+  name               String?
+  smtpHost           String
+  smtpPort           Int                @default(587)
+  smtpUser           String
+  smtpPass           String
+  hourlyLimit        Int                @default(100)
+  currentHourlyCount Int                @default(0)
+  windowResetAt      DateTime           @default(now())
+  isDefault          Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailJobs        EmailJob[]
+  campaigns        Campaign[]
+  rateLimitWindows RateLimitWindow[]
+
+  @@unique([userId, email])
+  @@map("senders")
+}
+
+model RateLimitWindow {
+  id          String   @id @default(uuid())
+  senderId    String
+  windowStart DateTime
+  sentCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sender Sender @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, windowStart])
+  @@index([senderId, windowStart])
+  @@map("rate_limit_windows")
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  userId          String
+  senderId        String?
+  name            String
+  subject         String
+  body            String         @db.Text
+  status          CampaignStatus @default(DRAFT)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  failureReason   String?        @db.Text
+  totalRecipients Int            @default(0)
+  sentCount       Int            @default(0)
+  failedCount     Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sender     Sender?             @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  recipients CampaignRecipient[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id          String          @id @default(uuid())
+  campaignId  String
+  email       String
+  firstName   String?
+  lastName    String?
+  company     String?
+  customData  Json?
+  status      RecipientStatus @default(PENDING)
+  sentAt      DateTime?
+  failedAt    DateTime?
+  error       String?         @db.Text
+  emailJobId  String?         @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  campaign Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  emailJob EmailJob? @relation(fields: [emailJobId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId, status])
+  @@index([campaignId, email])
+  @@map("campaign_recipients")
+}
+
+model EmailJob {
+  id             String      @id @default(uuid())
+  userId         String
+  senderId       String
+  recipient      String
+  subject        String
+  body           String      @db.Text
+  scheduledAt    DateTime
+  status         JobStatus   @default(SCHEDULED)
+  attempts       Int         @default(0)
+  maxAttempts    Int         @default(3)
+  sentAt         DateTime?
+  failedAt       DateTime?
+  failureReason  String?     @db.Text
+  bullJobId      String?     @unique
+  idempotencyKey String      @unique
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sender            Sender                 @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  attemptsList      EmailDeliveryAttempt[]
+  campaignRecipient CampaignRecipient?
+
+  @@index([userId, status])
+  @@index([userId, scheduledAt])
+  @@index([senderId, scheduledAt])
+  @@index([status])
+  @@map("email_jobs")
+}
+
+model EmailDeliveryAttempt {
+  id           String        @id @default(uuid())
+  emailJobId   String
+  status       AttemptStatus
+  error        String?       @db.Text
+  responseCode String?
+  attemptedAt  DateTime      @default(now())
+
+  emailJob EmailJob @relation(fields: [emailJobId], references: [id], onDelete: Cascade)
+
+  @@index([emailJobId])
+  @@map("email_delivery_attempts")
+}
+
+model SlackConnection {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  slackUserId String
+  teamId      String
+  teamName    String?
+  accessToken String   @db.Text
+  webhookUrl  String?  @db.Text
+  channelId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("slack_connections")
+}

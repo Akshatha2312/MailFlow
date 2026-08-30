@@ -1,0 +1,47 @@
+# Stage 1: Build & Prune
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy workspace dependencies
+COPY package*.json ./
+COPY tsconfig.base.json ./
+COPY packages/shared/package*.json ./packages/shared/
+COPY workers/email-worker/package*.json ./workers/email-worker/
+COPY prisma ./prisma/
+
+RUN apk add --no-cache openssl
+
+# Install dependencies
+RUN npm ci
+
+# Copy source files
+COPY packages/shared ./packages/shared
+COPY workers/email-worker ./workers/email-worker
+
+# Build shared package, Prisma client, and Email Worker
+RUN npm run build --workspace=packages/shared
+RUN npx prisma generate
+RUN npm run build --workspace=workers/email-worker
+
+# Prune dev dependencies for production
+RUN npm prune --production
+
+# Stage 2: Minimal Production Worker Runtime
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Install openssl for Prisma runtime
+RUN apk add --no-cache openssl
+
+# Copy node_modules, generated Prisma assets, and built worker artifacts
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/workers/email-worker ./workers/email-worker
+COPY --from=builder /app/prisma ./prisma
+
+CMD ["node", "workers/email-worker/dist/index.js"]

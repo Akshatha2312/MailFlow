@@ -1,0 +1,53 @@
+# Stage 1: Build & Prune
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy root workspace package definitions
+COPY package*.json ./
+COPY tsconfig.base.json ./
+COPY packages/shared/package*.json ./packages/shared/
+COPY apps/api/package*.json ./apps/api/
+COPY prisma ./prisma/
+
+RUN apk add --no-cache openssl
+
+# Install dependencies
+RUN npm ci
+
+# Copy source files
+COPY packages/shared ./packages/shared
+COPY apps/api ./apps/api
+
+# Build shared package, Prisma client, and Express API
+RUN npm run build --workspace=packages/shared
+RUN npx prisma generate
+RUN npm run build --workspace=apps/api
+
+# Prune dev dependencies for production
+RUN npm prune --production
+
+# Stage 2: Minimal Production Runtime
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Install curl and openssl for Docker health check and Prisma
+RUN apk add --no-cache curl openssl
+
+# Copy pruned node_modules, generated Prisma assets, and built artifacts
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/apps/api ./apps/api
+COPY --from=builder /app/prisma ./prisma
+
+EXPOSE 4000
+
+# Health check endpoint
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:4000/health || exit 1
+
+CMD ["node", "apps/api/dist/server.js"]

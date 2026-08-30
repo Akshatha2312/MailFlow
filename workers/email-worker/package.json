@@ -1,0 +1,26 @@
+{
+  "name": "@mailflow/email-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@mailflow/shared": "*",
+    "@prisma/client": "^5.10.2",
+    "bullmq": "^5.1.5",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.3.2",
+    "nodemailer": "^6.9.9"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/nodemailer": "^6.4.14",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}
