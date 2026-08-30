@@ -32,7 +32,9 @@ export function StatusChecker() {
   const fetchHealth = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/health');
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      const apiOrigin = apiBase.replace(/\/api\/?$/, '');
+      const res = await fetch(`${apiOrigin}/health`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
