@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
-import { StatusChecker } from '@/components/StatusChecker';
 import { Mail, Zap, Shield, Search, Slack, ArrowRight, LayoutDashboard, Send, BarChart3, Users, Sparkles } from 'lucide-react';
 
 export default function Home() {
@@ -90,10 +89,6 @@ export default function Home() {
           </Link>
         </section>
 
-        {/* Live Infrastructure Status Dashboard */}
-        <section className="max-w-4xl mx-auto w-full">
-          <StatusChecker />
-        </section>
       </main>
 
       {/* Footer */}
