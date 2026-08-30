@@ -270,7 +270,7 @@ export class CampaignRepository {
    * for each recipient, creating persistent EmailJob records in PostgreSQL, and updating state to QUEUED/SENDING.
    */
   static async launchCampaign(campaignId: string, userId: string): Promise<CampaignWithRelations> {
-    const { emailQueue } = await import('../config/queue');
+    const { emailQueue } = await import('../config/queue.js');
     const { Logger } = await import('@mailflow/shared');
 
     const result = await prisma.$transaction(async (tx) => {
