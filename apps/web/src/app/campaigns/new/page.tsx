@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
@@ -34,6 +34,7 @@ export default function NewCampaignPage() {
   const [parsedRecipients, setParsedRecipients] = useState<RecipientInput[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [csvError, setCsvError] = useState<string | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   // Scheduling state
   const [isScheduled, setIsScheduled] = useState(false);
@@ -98,7 +99,20 @@ export default function NewCampaignPage() {
     const reader = new FileReader();
     reader.onload = () => {
       const result = parseCsvContacts(String(reader.result || ''));
-      if (result.contacts.length > 0) setRawRecipientsText(formatCsvContacts(result.contacts));
+      if (result.contacts.length > 0) {
+        const existingEmails = new Set(
+          rawRecipientsText
+            .split('\n')
+            .map((line) => line.split(/[,;\t]/)[0]?.trim().toLowerCase())
+            .filter(Boolean)
+        );
+        const newContacts = result.contacts.filter((contact) => !existingEmails.has(contact.email.toLowerCase()));
+        if (newContacts.length > 0) {
+          setRawRecipientsText((currentText) =>
+            [currentText.trim(), formatCsvContacts(newContacts)].filter(Boolean).join('\n')
+          );
+        }
+      }
       setCsvError(result.error || null);
     };
     reader.onerror = () => setCsvError('Failed to read the CSV file.');
@@ -339,25 +353,30 @@ export default function NewCampaignPage() {
                 Enter Recipients (One per line: email, firstName, lastName, company)
               </label>
               <p className="text-xs text-gray-500 mb-2">Example: alex@acme.com, Alex, Smith, Acme Corp</p>
-              <label className="inline-flex items-center gap-2 px-4 py-2 mb-3 rounded-xl bg-white/5 text-gray-300 hover:bg-white/10 text-sm font-medium cursor-pointer transition-colors">
-                <Upload className="w-4 h-4" />
-                Upload CSV
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    handleCsvUpload(e.target.files?.[0]);
-                    e.currentTarget.value = '';
-                  }}
-                />
-              </label>
               <textarea
                 rows={6}
                 placeholder="sarah@skynet.com, Sarah, Connor, Skynet&#10;john@cyberdyne.com, John, Doe, Cyberdyne"
                 value={rawRecipientsText}
                 onChange={(e) => setRawRecipientsText(e.target.value)}
                 className="w-full p-4 bg-black/40 border border-white/10 rounded-xl text-white font-mono text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+              <button
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+                className="inline-flex items-center gap-2 px-4 py-2 mt-3 rounded-xl bg-white/5 text-gray-300 hover:bg-white/10 text-sm font-medium cursor-pointer transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                Upload CSV
+              </button>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  handleCsvUpload(e.target.files?.[0]);
+                  e.currentTarget.value = '';
+                }}
               />
               {csvError && <p className="mt-2 text-xs text-rose-400">{csvError}</p>}
             </div>
