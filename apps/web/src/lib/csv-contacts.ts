@@ -60,6 +60,7 @@ export function parseCsvContacts(content: string): CsvContactParseResult {
   const companyIndex = hasHeader ? normalizedHeaders.indexOf('company') : 3;
   const contacts: CsvContact[] = [];
   const invalidRows: number[] = [];
+  const seenEmails = new Set<string>();
 
   dataRows.forEach((row, index) => {
     const email = row[emailIndex]?.trim() || '';
@@ -68,6 +69,10 @@ export function parseCsvContacts(content: string): CsvContactParseResult {
       invalidRows.push(index + (hasHeader ? 2 : 1));
       return;
     }
+
+    const normalizedEmail = email.toLowerCase();
+    if (seenEmails.has(normalizedEmail)) return;
+    seenEmails.add(normalizedEmail);
 
     contacts.push({
       email,
