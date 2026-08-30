@@ -8,6 +8,10 @@ export const authRouter = Router();
 // Store temporary state tokens in memory (or Redis in multi-instance prod)
 const pendingStates = new Set<string>();
 
+const getGoogleCallbackUrl = () =>
+  process.env.GOOGLE_CALLBACK_URL ||
+  `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/auth/google/callback`;
+
 /**
  * GET /api/auth/google
  * Initiates Google OAuth 2.0 flow by generating authorization redirect URL
@@ -20,7 +24,7 @@ authRouter.get('/google', (req: Request, res: Response) => {
     return res.redirect(`${frontendUrl}/login?error=google_oauth_not_configured`);
   }
 
-  const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/auth/google/callback`;
+  const redirectUri = getGoogleCallbackUrl();
   const state = crypto.randomBytes(16).toString('hex');
   pendingStates.add(state);
 
@@ -53,7 +57,7 @@ authRouter.get('/google/callback', async (req: Request, res: Response) => {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/auth/google/callback`;
+  const redirectUri = getGoogleCallbackUrl();
 
   if (!clientId || !clientSecret || clientId.trim() === '' || clientSecret.trim() === '') {
     return res.redirect(`${frontendUrl}/login?error=google_oauth_not_configured`);

@@ -307,11 +307,13 @@ npm install
 
 Create a root `.env` using the variables above. Do not commit credentials.
 
-Start local infrastructure:
+Start the complete local Docker environment (API on port 4000, web on port 3000, worker, PostgreSQL, Redis, and Elasticsearch):
 
 ```bash
-docker compose up -d
+npm run dev
 ```
+
+`npm run dev:docker` is an equivalent explicit command. This is the default local workflow.
 
 Generate Prisma Client and apply the appropriate development migration:
 
@@ -320,7 +322,9 @@ npm run db:generate
 npx prisma migrate dev
 ```
 
-Start the processes in separate terminals:
+Do not run `npm run dev:api` while the Compose API is running: both use port 4000 and the host process will fail with `EADDRINUSE`. Do not run `npm run dev:web` while the Compose web service is running either, because both use port 3000.
+
+The host process commands are available for a deliberate hybrid workflow only. In that mode, stop the Compose `api` or `web` service first and keep the supporting infrastructure running:
 
 ```bash
 npm run dev:api
